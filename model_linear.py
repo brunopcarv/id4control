@@ -7,17 +7,6 @@ import math
 
 class LinearModel():
 
-# Parameters (growth, death, and mutual influences rates)
-# a, b, c, d = 1, 1, 1, 1
-
-# States
-# x1 = prey population
-# x2 = predator population
-
-# Model
-# x1(k+1) = a x1(k) - b x1(k) x2(k)
-# x2(k+1) = - c x2(k) + d x1(k) x2(k)
-
 	def __init__(self, A, B, xo, dt):
 		self.A = A
 		self.B = B
