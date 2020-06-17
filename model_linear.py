@@ -14,9 +14,10 @@ class LinearModel():
 		self.xo = xo
 		self.k = 0
 		self.dt = dt # delta t: sample period
+		self.u = None
 
-	def forcing(self):
-		return 2*math.sin(self.k*self.dt) + 2*math.sin(self.k*self.dt/10)
+	def forcing(self): #Control law
+		return self.u
 
 
 	def next_points(self):
@@ -43,6 +44,3 @@ class LinearModel():
 
 		self.reset()
 		return x_list, range(k)
-
-
-
