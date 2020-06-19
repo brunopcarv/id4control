@@ -50,7 +50,7 @@ if __name__ == "__main__":
 	controller = NoController()
 	plant = PredatorPreyPlant(1.0, 1.0, 1.0, 1.0)
 
-	xo = np.array([1.0, 1.0]).T
+	xo = np.array([2.0, 1.0]).T
 	closed_loop = ClosedLoopSystem(plant, controller, xo)
 
 	final_time_unit = 2000
