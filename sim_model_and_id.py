@@ -50,11 +50,11 @@ M = np.zeros((m, m))
 # RBF kernel id
 lambda_reg = 0.00001
 regression = KernelRidgeRegression(lambda_reg)
-regression.training(X, Y, kernel_rbf_function)
+regression.training(X, Y, kernel_rbf_function_M)
 
 Y_ridge = np.array([x1[:half], x2[:half]]).T
 for k in range(half,final_time_unit):
-	y, N = regression.predict(Y_ridge[-1,:], kernel_rbf_function)
+	y, N = regression.predict(Y_ridge[-1,:], kernel_rbf_function_N)
 	Y_ridge = np.append(Y_ridge, [y], axis=0)
 
 

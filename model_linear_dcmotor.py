@@ -3,7 +3,6 @@
 #  Linear DC Motor - Model
 
 import numpy as np
-import math
 
 from nmodel_linear import LinearModel
 
