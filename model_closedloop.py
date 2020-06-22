@@ -54,7 +54,8 @@ if __name__ == "__main__":
 	closed_loop = ClosedLoopSystem(plant, controller, xo)
 
 	final_time_unit = 2000
-	half = int(final_time_unit*0.5)
+	half = int(final_time_unit*0.25)
+	quarter = int(half*0.05)
 
 	x, time = closed_loop.run(final_time_unit)
 	x1 = x[:,0]
@@ -62,6 +63,10 @@ if __name__ == "__main__":
 
 	X = np.array([x1[:half-1], x2[:half-1]]).T
 	Y = np.array([x1[1:half], x2[1:half]]).T
+
+
+
+
 
 	from id_kernel_ridge_regression import KernelRidgeRegression, \
 	kernel_rbf_function_M, kernel_rbf_function_N, kernel_linear_function, \
@@ -71,23 +76,36 @@ if __name__ == "__main__":
 	# RBF kernel id
 	lambda_reg = 0.00001
 	regression = KernelRidgeRegression(lambda_reg)
-	regression.training(X, Y, kernel_rbf_function_M)
+	# regression.training(X[:quarter,:], Y[:quarter,:], kernel_rbf_function_M)
+	regression.training(X[:half,:], Y[:half,:], kernel_rbf_function_M)
+
 
 	Y_ridge = np.array([x1[:half], x2[:half]]).T
 	for k in range(half,final_time_unit):
 		y, N = regression.predict(Y_ridge[-1,:], kernel_rbf_function_N)
 		Y_ridge = np.append(Y_ridge, [y], axis=0)
 
+
+	# RBF kernel id
+	random_ids = np.random.choice(half-1, size=quarter, replace=False) 
+	regression_random = KernelRidgeRegression(lambda_reg)
+	regression_random.training(X[random_ids,:], Y[random_ids,:], kernel_rbf_function_M)
+
+	Y_ridge_random = np.array([x1[:half], x2[:half]]).T
+	for k in range(half,final_time_unit):
+		y, N = regression_random.predict(Y_ridge_random[-1,:], kernel_rbf_function_N)
+		Y_ridge_random = np.append(Y_ridge_random, [y], axis=0)
+
 	# Plot
 	import matplotlib.pyplot as plt
 	fig, axs = plt.subplots(2, 1)
-	axs[0].plot(time, x1, time, Y_ridge[:,0])
+	axs[0].plot(time, x1, time, Y_ridge[:,0], time, Y_ridge_random[:,0])
 	axs[0].set_xlim(0,final_time_unit)
 	axs[0].set_xlabel('Time units (k)')
 	axs[0].set_ylabel('Prey: x1 (actual) and x1 (ridge)')
 	axs[0].grid(True)
 
-	axs[1].plot(time, x2, time, Y_ridge[:,1])
+	axs[1].plot(time, x2, time, Y_ridge[:,1], time, Y_ridge_random[:,1])
 	axs[1].set_xlim(0,final_time_unit)
 	axs[1].set_xlabel('Time units (k)')
 	axs[1].set_ylabel('Pred: x2 (actual) and x2 (ridge)')
