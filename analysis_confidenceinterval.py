@@ -38,14 +38,15 @@ if __name__ == "__main__":
 	)
 
 	parser.add_argument("--plant", 
-	 choices=['LinearPlant', 'LinearDCMotorPlant', 'InvertedPendulum', 'PredatorPreyPlant'],
-	 default='linear',
+	 choices=['linear', 'dcmotor', 'invertedpendulum', 'predatorprey'],
+	 default='predatorprey',
 	 help="Model plant to be simulated",
 	)
 
 	parser.add_argument("--dt", 
 	 default=0.01,
-	 help="Sampling time of simulation",
+	 type=np.float32,
+	 help="Sampling time of simulation (seconds)",
 	)
 
 	parser.add_argument("--timelapses",
@@ -64,7 +65,6 @@ if __name__ == "__main__":
 	 help="Ratio of the training dataset available for actual training",
 	)
 
-
 	try:
 		import argcomplete
 		argcomplete.autocomplete(parser)
@@ -73,29 +73,40 @@ if __name__ == "__main__":
 
 	args = parser.parse_args()
 
-	kernel = args.kernel
-	dispatcher0={'linear':kernel_linear_function, 
-				'poly':kernel_poly_function,
-				'rbf':kernel_rbf_function_M, 
-				'tanh':kernel_tanh_function}
-	dispatcher1={'linear':kernel_linear_function, 
-				'poly':kernel_poly_function,
-				'rbf':kernel_rbf_function_N, 
-				'tanh':kernel_tanh_function}
-	try:
-		kernel_function=[dispatcher0[kernel], dispatcher1[kernel]]
-	except KeyError:
-		raise ValueError('invalid input')
-
 	logging.basicConfig(
 	 level=getattr(logging, args.log_level),
 	 format="%(levelname)s %(message)s"
 	)
 
+
+	kernel = args.kernel
+	dispatcher0={'linear':kernel_linear_function,
+				'poly':kernel_poly_function,
+				'rbf':kernel_rbf_function_M,
+				'tanh':kernel_tanh_function}
+	dispatcher1={'linear':kernel_linear_function,
+				'poly':kernel_poly_function,
+				'rbf':kernel_rbf_function_N,
+				'tanh':kernel_tanh_function}
+	try:
+		kernel_function=[dispatcher0[kernel], dispatcher1[kernel]]
+	except KeyError:
+		raise ValueError('invalid input')
 	logger.info("Kernel: %s", kernel)
 
+	plant = args.plant
+	dispatcher2={'linear':LinearPlant,
+				'dcmotor':LinearDCMotorPlant,
+				'invertedpendulum':InvertedPendulum,
+				'predatorprey':PredatorPreyPlant}
+	try:
+		plant_model=dispatcher2[plant]
+	except KeyError:
+		raise ValueError('invalid input')
+	logger.info("Plant: %s", plant)
+
 	dt = args.dt
-	logger.info("dt: %s", dt)
+	logger.info("dt: %ss", dt)
 
 	number_of_time_lapses = args.timelapses
 	logger.info("Number of time lapses: %d", number_of_time_lapses)
@@ -106,9 +117,11 @@ if __name__ == "__main__":
 	number_of_sampled_points = int(number_of_training_points*samplingratio)
 	logger.info("Train ratio: %s, total points: %d", trainration, number_of_training_points)
 	logger.info("Sampling ratio: %s, total points: %d", samplingratio, number_of_sampled_points)
-	
+
 	random_ids = np.random.choice(number_of_training_points-1, size=number_of_sampled_points, replace=False)
 	logger.info("Total random points: %d", np.shape(random_ids)[0])
+
+	logger.info("Final time: %ss", number_of_time_lapses*dt)
 
 
 	# Scalar zero controller
@@ -119,7 +132,7 @@ if __name__ == "__main__":
 			return 0
 
 	controller = NoController()
-	plant = PredatorPreyPlant(1.0, 1.0, 1.0, 1.0)
+	plant = plant_model(1.0, 1.0, 1.0, 1.0)
 	# plant = LinearDCMotorPlant(0.20, 0.015, 0.2, 1.015, 0.2 ,0.5)
 
 	xo = np.array([2.0, 1.0]).T
