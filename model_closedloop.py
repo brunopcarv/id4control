@@ -87,7 +87,7 @@ if __name__ == "__main__":
 
 
 	# RBF kernel id
-	random_ids = np.random.choice(half-1, size=quarter, replace=False) 
+	random_ids = np.random.choice(half-1, size=quarter, replace=False)
 	regression_random = KernelRidgeRegression(lambda_reg)
 	regression_random.training(X[random_ids,:], Y[random_ids,:], kernel_rbf_function_M)
 
@@ -95,6 +95,52 @@ if __name__ == "__main__":
 	for k in range(half,final_time_unit):
 		y, N = regression_random.predict(Y_ridge_random[-1,:], kernel_rbf_function_N)
 		Y_ridge_random = np.append(Y_ridge_random, [y], axis=0)
+
+
+
+
+	# Laplace kernel TODO: update
+	def kernel_laplace_function_M(X, Y, var=1.0, gamma=1.0):
+		import numexpr as ne
+		X_norm = np.sum(X**2, axis=-1)
+		return ne.evaluate('v * exp(-g * (A + B - 2 * C))', {
+		        'A' : X_norm[:,None],
+		        'B' : X_norm[None,:],
+		        'C' : np.dot(X, X.T),
+		        'g' : gamma,
+		        'v' : var
+		})
+
+	# Similarity Sampling
+	def similarity_sampling_increment(X, x_candidates, similarity_function):
+		dets = list()
+		# M = similarity_function(X, X)
+		# dets.append(np.linalg.det(M))
+		for x in x_candidates:
+			X_extended = X
+			X_extended = np.append(X_extended, [x], axis=0)
+			M = similarity_function(X_extended, X_extended)
+			dets.append(np.linalg.det(M))
+		id_maxdet =  dets.index(max(dets))
+		x_maxdet = x[id_maxdet]
+		return x_maxdet
+
+	def similarity_sampling(X, m_tilde, similarity_function):
+		m, n = np.shape(X)
+		X_current = X[0:10,:]
+		X_sampled = np.zeros((m_tilde, n))
+		for i in range(m_tilde):
+			a = X_current[10+i,:]
+			b = X_current[10+(i+1)*2]
+			candidates = list([a,b])
+			X_sampled[i,:] =  similarity_sampling_increment(
+				X_current,
+				candidates,
+				similarity_function,
+				)
+
+
+
 
 	# Plot
 	import matplotlib.pyplot as plt
