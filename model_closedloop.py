@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
 	Y_ridge = np.array([x1[:half], x2[:half]]).T
 	for k in range(half,final_time_unit):
-		y, N = regression.predict(Y_ridge[-1,:], kernel_rbf_function_N)
+		y = regression.predict(Y_ridge[-1,:], kernel_rbf_function_N)
 		Y_ridge = np.append(Y_ridge, [y], axis=0)
 
 
@@ -93,7 +93,7 @@ if __name__ == "__main__":
 
 	Y_ridge_random = np.array([x1[:half], x2[:half]]).T
 	for k in range(half,final_time_unit):
-		y, N = regression_random.predict(Y_ridge_random[-1,:], kernel_rbf_function_N)
+		y = regression_random.predict(Y_ridge_random[-1,:], kernel_rbf_function_N)
 		Y_ridge_random = np.append(Y_ridge_random, [y], axis=0)
 
 
