@@ -103,18 +103,12 @@ class KernelRidgeRegression():
 		self.X = X
 		self.Y = Y
 		self.m, self.n = np.shape(X)
-
 		self.M = kernel_function(X,X)
 		self.inverse = np.linalg.inv(self.M + self.lambda_reg*np.identity(self.m, dtype = float))
 		return self.M
 
 	def predict(self, x, kernel_function):
 		N = kernel_function(x, self.X)
-
-		# print(np.shape(N.T))
-		# print(np.shape(self.M ))
-		# print(np.shape(self.Y))
-		# print(self.inverse)
 		temp = np.dot(N.T, self.inverse)
 		hat_y = np.dot(temp, self.Y)
-		return hat_y.T, N
+		return hat_y.T
