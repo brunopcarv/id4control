@@ -18,8 +18,8 @@ if __name__ == "__main__":
 			return 0
 
 	controller = NoController()
-	# plant = PredatorPreyPlant(2/3, 4/3, 1.0, 1.0)
-	plant = LinearDCMotorPlant(0.20, 0.015, 0.2, 1.015, 0.2 ,0.5)
+	plant = PredatorPreyPlant(2/3, 4/3, 1.0, 1.0)
+	# plant = LinearDCMotorPlant(0.20, 0.015, 0.2, 1.015, 0.2 ,0.5)
 
 	xo = np.array([20.0, 10.0]).T
 	closed_loop = ClosedLoopSystem(plant, controller, xo, dt=0.01)
