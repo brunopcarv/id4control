@@ -6,18 +6,23 @@ import numpy as np
 
 class ClosedLoopSystem():
 
-	def __init__(self, plant, controller, xo, dt=0.01):
+	def __init__(self, plant, controller, additive_noise_gen, xo, dt=0.01):
 		self.plant = plant
 		self.controller = controller
 		self.x = xo
 		self.xo = xo
 		self.k = 0
 		self.dt = dt # delta t: sample period
+		self.additive_noise_gen = additive_noise_gen
 
 	def next_points(self):
 		x_temp = self.x
 
-		self.x = self.plant.dynamics(x_temp, self.controller.action(x_temp), self.dt)
+		self.x = self.plant.dynamics(x_temp,
+		 self.controller.action(x_temp),
+		 self.additive_noise_gen,
+		 self.dt)
+
 		self.k += 1
 		return self.x
 

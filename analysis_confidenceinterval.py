@@ -12,8 +12,8 @@ kernel_poly_function, kernel_tanh_function
 from id_linear_ridge_regression import LinearRidgeRegression
 
 from model_closedloop import ClosedLoopSystem
-from model_plants import LinearPlant, LinearDCMotorPlant, \
-InvertedPendulum, PredatorPreyPlant
+from model_plants import LinearPlantDiscrete, LinearPlantContinuous, \
+LinearDCMotorPlant, InvertedPendulum, PredatorPreyPlant
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ if __name__ == "__main__":
 	)
 
 	parser.add_argument("--plant", 
-	 choices=['linear', 'dcmotor', 'invertedpendulum', 'predatorprey'],
+	 choices=['lineard', 'linearc', 'dcmotor', 'invertedpendulum', 'predatorprey'],
 	 default='predatorprey',
 	 help="Model plant to be simulated",
 	)
@@ -65,6 +65,12 @@ if __name__ == "__main__":
 	 help="Ratio of the training dataset available for actual training",
 	)
 
+	parser.add_argument("--regularization",
+	 default=0.001,
+	 type=float,
+	 help="Regularization parameter for regression",
+	)
+
 	try:
 		import argcomplete
 		argcomplete.autocomplete(parser)
@@ -81,9 +87,9 @@ if __name__ == "__main__":
 
 	kernel = args.kernel
 	dispatcher0={'linear':kernel_linear_function,
-				'poly':kernel_poly_function,
-				'rbf':kernel_rbf_function_M,
-				'tanh':kernel_tanh_function}
+				 'poly':kernel_poly_function,
+				 'rbf':kernel_rbf_function_M,
+				 'tanh':kernel_tanh_function}
 	dispatcher1={'linear':kernel_linear_function,
 				'poly':kernel_poly_function,
 				'rbf':kernel_rbf_function_N,
@@ -94,11 +100,15 @@ if __name__ == "__main__":
 		raise ValueError('invalid input')
 	logger.info("Kernel: %s", kernel)
 
+	lambda_reg = args.regularization
+	logger.info("Regularization: %s", lambda_reg)
+
 	plant = args.plant
-	dispatcher2={'linear':LinearPlant,
-				'dcmotor':LinearDCMotorPlant,
-				'invertedpendulum':InvertedPendulum,
-				'predatorprey':PredatorPreyPlant}
+	dispatcher2={'lineard':LinearPlantDiscrete,
+				 'linearc':LinearPlantContinuous,
+				 'dcmotor':LinearDCMotorPlant,
+				 'invertedpendulum':InvertedPendulum,
+				 'predatorprey':PredatorPreyPlant}
 	try:
 		plant_model=dispatcher2[plant]
 	except KeyError:
@@ -131,12 +141,31 @@ if __name__ == "__main__":
 		def action(self, x):
 			return 0
 
+
+	# TODO: Correct gaussian noise generator with mu and sigma
+	# TODO: Performance Evaluation and Comparisson with existing methods
+
+	def gaussian_noise(mu, sigma):
+		while True:
+			yield np.random.normal(mu, sigma)
+
+	def no_noise():
+		while True:
+			yield 0
+
+	def bias_only_noise(bias):
+		while True:
+			yield bias
+
+
 	controller = NoController()
 	plant = plant_model(1.0, 1.0, 1.0, 1.0)
 	# plant = LinearDCMotorPlant(0.20, 0.015, 0.2, 1.015, 0.2 ,0.5)
 
+	additiveNoise = gaussian_noise(0.0, 0.2)
+
 	xo = np.array([2.0, 1.0]).T
-	closed_loop = ClosedLoopSystem(plant, controller, xo, dt=dt)
+	closed_loop = ClosedLoopSystem(plant, controller, additiveNoise, xo, dt=dt)
 
 
 
@@ -149,13 +178,12 @@ if __name__ == "__main__":
 
 
 	# RBF kernel id
-	lambda_reg = 0.00001
 	regression = KernelRidgeRegression(lambda_reg)
 	regression.training(X_train[:number_of_sampled_points,:], Y_train[:number_of_sampled_points,:], kernel_function[0])
 
 
-	Y_ridge = np.array([x1[:number_of_training_points], x2[:number_of_training_points]]).T
-	for k in range(number_of_training_points,number_of_time_lapses):
+	Y_ridge = np.array([[x1[number_of_training_points-1]], [x2[number_of_training_points-1]]]).T
+	for k in range(number_of_training_points, number_of_time_lapses):
 		y = regression.predict(Y_ridge[-1,:], kernel_function[1])
 		Y_ridge = np.append(Y_ridge, [y], axis=0)
 
@@ -164,8 +192,8 @@ if __name__ == "__main__":
 	regression_random = KernelRidgeRegression(lambda_reg)
 	regression_random.training(X_train[random_ids,:], Y_train[random_ids,:], kernel_function[0])
 
-	Y_ridge_random = np.array([x1[:number_of_training_points], x2[:number_of_training_points]]).T
-	for k in range(number_of_training_points,number_of_time_lapses):
+	Y_ridge_random = np.array([[x1[number_of_training_points-1]], [x2[number_of_training_points-1]]]).T
+	for k in range(number_of_training_points, number_of_time_lapses):
 		y = regression_random.predict(Y_ridge_random[-1,:], kernel_function[1])
 		Y_ridge_random = np.append(Y_ridge_random, [y], axis=0)
 
@@ -173,14 +201,14 @@ if __name__ == "__main__":
 	# Plot
 	import matplotlib.pyplot as plt
 	fig, axs = plt.subplots(2, 1)
-	axs[0].plot(time, x1, "r", time, Y_ridge[:,0], time, Y_ridge_random[:,0])
+	axs[0].plot(time, x1, "r", time[number_of_training_points:], Y_ridge[1:,0], time[number_of_training_points:], Y_ridge_random[1:,0])
 	axs[0].set_xlim(0,number_of_time_lapses)
 	axs[0].set_xlabel('Time units (k)')
 	axs[0].set_ylabel('Prey: x1 (actual) and x1 (ridge)')
 	axs[0].grid(True)
 	axs[0].legend(['Actual', 'Pred', 'Pred random sampling'])
 
-	axs[1].plot(time, x2, "r", time, Y_ridge[:,1], time, Y_ridge_random[:,1])
+	axs[1].plot(time, x2, "r", time[number_of_training_points:], Y_ridge[1:,1], time[number_of_training_points:], Y_ridge_random[1:,1])
 	axs[1].set_xlim(0,number_of_time_lapses)
 	axs[1].set_xlabel('Time units (k)')
 	axs[1].set_ylabel('Pred: x2 (actual) and x2 (ridge)')
@@ -199,13 +227,17 @@ if __name__ == "__main__":
 	if 0:
 		import matplotlib.pyplot as plt
 		fig, axs = plt.subplots(2, 1)
-		axs[0].plot(x[number_of_training_points:-1,0], x[number_of_training_points+1:,0], "r", Y_ridge[number_of_training_points:-1,0], Y_ridge[number_of_training_points+1:,0], ".", Y_ridge_random[number_of_training_points:-1,0], Y_ridge_random[number_of_training_points+1:,0], ".")
+		axs[0].plot(x[number_of_training_points:-1,0], x[number_of_training_points+1:,0], "r",
+		 Y_ridge[number_of_training_points:-1,0], Y_ridge[number_of_training_points+1:,0], ".",
+		 Y_ridge_random[number_of_training_points:-1,0], Y_ridge_random[number_of_training_points+1:,0], ".")
 		axs[0].set_xlabel('x1(k)')
 		axs[0].set_ylabel('x1(k+1)')
 		axs[0].grid(True)
 		axs[0].legend(['Actual', 'Pred', 'Pred random sampling'])
 
-		axs[1].plot(x[number_of_training_points:-1,1], x[number_of_training_points+1:,1], "r", Y_ridge[number_of_training_points:-1,1], Y_ridge[number_of_training_points+1:,1], ".", Y_ridge_random[number_of_training_points:-1,1], Y_ridge_random[number_of_training_points+1:,1],".")
+		axs[1].plot(x[number_of_training_points:-1,1], x[number_of_training_points+1:,1], "r",
+		 Y_ridge[number_of_training_points:-1,1], Y_ridge[number_of_training_points+1:,1], ".",
+		 Y_ridge_random[number_of_training_points:-1,1], Y_ridge_random[number_of_training_points+1:,1],".")
 		axs[1].set_xlabel('x2(k)')
 		axs[1].set_ylabel('x2(k+1)')
 		axs[1].grid(True)
@@ -221,7 +253,9 @@ if __name__ == "__main__":
 	if 0:
 		import matplotlib.pyplot as plt
 		fig, axs = plt.subplots(2, 1)
-		axs[0].plot(x[number_of_training_points:,0], x[number_of_training_points:,1], "r.", Y_ridge[number_of_training_points:,0], Y_ridge[number_of_training_points:,1], ".", Y_ridge_random[number_of_training_points:,0], Y_ridge_random[number_of_training_points:,1], ".")
+		axs[0].plot(x[number_of_training_points:,0], x[number_of_training_points:,1], "r.",
+		 Y_ridge[number_of_training_points:,0], Y_ridge[number_of_training_points:,1], ".",
+		 Y_ridge_random[number_of_training_points:,0], Y_ridge_random[number_of_training_points:,1], ".")
 		axs[0].set_xlabel('x1(k)')
 		axs[0].set_ylabel('x1(k+1)')
 		axs[0].grid(True)
@@ -268,7 +302,7 @@ if __name__ == "__main__":
 
 	for i in range(np.shape(x)[0]):
 		for j in range(np.shape(y)[0]):
-			z1[i,j], z2[i,j] = plant.dynamics(np.array([x[i], y[j]]), 0, dt)
+			z1[i,j], z2[i,j] = plant.dynamics(np.array([x[i], y[j]]), 0, no_noise(), dt)
 			z1_reg[i,j], z2_reg[i,j] = regression.predict(np.array([x[i], y[j]]), kernel_function[1])
 			z1_regrndsample[i,j], z2_regrndsample[i,j] = regression_random.predict(np.array([x[i], y[j]]), kernel_function[1])
 
