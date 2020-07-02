@@ -55,13 +55,15 @@ if __name__ == "__main__":
 	 help="Final time of model simulation",
 	)
 
-	parser.add_argument("--trainration",
+	parser.add_argument("--trainratio",
 	 default=0.5,
+	 type=float,
 	 help="Dataset training ratio",
 	)
 
-	parser.add_argument("--samplingration",
+	parser.add_argument("--samplingratio",
 	 default=0.5,
+	 type=float,
 	 help="Ratio of the training dataset available for actual training",
 	)
 
@@ -121,11 +123,11 @@ if __name__ == "__main__":
 	number_of_time_lapses = args.timelapses
 	logger.info("Number of time lapses: %d", number_of_time_lapses)
 
-	trainration = args.trainration
-	samplingratio = args.trainration
-	number_of_training_points = int(number_of_time_lapses*trainration)
+	trainratio = args.trainratio
+	samplingratio = args.samplingratio
+	number_of_training_points = int(number_of_time_lapses*trainratio)
 	number_of_sampled_points = int(number_of_training_points*samplingratio)
-	logger.info("Train ratio: %s, total points: %d", trainration, number_of_training_points)
+	logger.info("Train ratio: %s, total points: %d", trainratio, number_of_training_points)
 	logger.info("Sampling ratio: %s, total points: %d", samplingratio, number_of_sampled_points)
 
 	random_ids = np.random.choice(number_of_training_points-1, size=number_of_sampled_points, replace=False)
@@ -162,13 +164,13 @@ if __name__ == "__main__":
 	plant = plant_model(1.0, 1.0, 1.0, 1.0)
 	# plant = LinearDCMotorPlant(0.20, 0.015, 0.2, 1.015, 0.2 ,0.5)
 
-	additiveNoise = gaussian_noise(0.0, 0.2)
+	additiveNoise = gaussian_noise(0.0, 0.0)
 
 	xo = np.array([2.0, 1.0]).T
 	closed_loop = ClosedLoopSystem(plant, controller, additiveNoise, xo, dt=dt)
 
 
-
+	logger.info("RUNNING PLANT MODEL...")
 	x, time = closed_loop.run(number_of_time_lapses)
 	x1 = x[:,0]
 	x2 = x[:,1]
@@ -176,21 +178,41 @@ if __name__ == "__main__":
 	X_train = np.array([x1[:number_of_training_points-1], x2[:number_of_training_points-1]]).T
 	Y_train = np.array([x1[1:number_of_training_points], x2[1:number_of_training_points]]).T
 
+	# Sample selection
+	if 0:
+		logger.info("SELECTING SAMPLES...")
+		from sampling_algorithms import MinSquaredNormSimilaritySampling
+		sampling_method = MinSquaredNormSimilaritySampling(number_of_sampled_points, kernel_function[1])
+		for idx in range(np.shape(X_train)[0]):
+			sampling_method.new_sample(X_train[idx,:], idx)
+		selected_ids = sampling_method.dataset_ids
+		logger.debug("Selected Ids: %s", selected_ids)
+	if 1:
+		logger.info("SELECTING SAMPLES...")
+		from sampling_algorithms import MinSquaredNormSimilaritySampling
+		sampling_method = MinSquaredNormSimilaritySampling(number_of_sampled_points, kernel_function[1])
+		random_ids_to_select = np.random.permutation(number_of_training_points-1)
+		for idx in random_ids_to_select:
+			sampling_method.new_sample(X_train[idx,:], idx)
+		selected_ids = sampling_method.dataset_ids
+		logger.debug("Selected Ids: %s", selected_ids)
 
+
+	logger.info("TRAINING...")
 	# RBF kernel id
 	regression = KernelRidgeRegression(lambda_reg)
-	regression.training(X_train[:number_of_sampled_points,:], Y_train[:number_of_sampled_points,:], kernel_function[0])
+	regression.training(X_train[selected_ids,:], Y_train[selected_ids,:], kernel_function[0])
 
+	# RBF kernel id random
+	regression_random = KernelRidgeRegression(lambda_reg)
+	regression_random.training(X_train[random_ids,:], Y_train[random_ids,:], kernel_function[0])
 
+	logger.info("PREDICTING...")
 	Y_ridge = np.array([[x1[number_of_training_points-1]], [x2[number_of_training_points-1]]]).T
 	for k in range(number_of_training_points, number_of_time_lapses):
 		y = regression.predict(Y_ridge[-1,:], kernel_function[1])
 		Y_ridge = np.append(Y_ridge, [y], axis=0)
 
-
-	# RBF kernel id random
-	regression_random = KernelRidgeRegression(lambda_reg)
-	regression_random.training(X_train[random_ids,:], Y_train[random_ids,:], kernel_function[0])
 
 	Y_ridge_random = np.array([[x1[number_of_training_points-1]], [x2[number_of_training_points-1]]]).T
 	for k in range(number_of_training_points, number_of_time_lapses):
@@ -198,6 +220,7 @@ if __name__ == "__main__":
 		Y_ridge_random = np.append(Y_ridge_random, [y], axis=0)
 
 
+	logger.info("PLOTTING...")
 	# Plot
 	import matplotlib.pyplot as plt
 	fig, axs = plt.subplots(2, 1)
@@ -317,7 +340,7 @@ if __name__ == "__main__":
 		axs1.plot_surface(X, Y, z1)
 		axs1.plot_surface(X, Y, z1_reg)
 		axs1.plot_surface(X, Y, z1_regrndsample)
-		axs1.scatter3D(X_train[:number_of_sampled_points,0], X_train[:number_of_sampled_points,1], np.zeros(np.shape(X_train[:number_of_sampled_points,0])), c='r', marker='x')
+		axs1.scatter3D(X_train[selected_ids,0], X_train[selected_ids,1], np.zeros(np.shape(X_train[selected_ids,0])), c='r', marker='x')
 		axs1.scatter3D(X_train[random_ids,0], X_train[random_ids,1], np.zeros(np.shape(X_train[random_ids,0])), c='g', marker='x')
 		# axs1.legend(['Actual', 'Pred', 'Pred random sampling'])
 
@@ -325,7 +348,7 @@ if __name__ == "__main__":
 		axs2.plot_surface(X, Y, z2)
 		axs2.plot_surface(X, Y, z2_reg)
 		axs2.plot_surface(X, Y, z2_regrndsample)
-		axs2.scatter3D(X_train[:number_of_sampled_points,0], X_train[:number_of_sampled_points,1], np.zeros(np.shape(X_train[:number_of_sampled_points,0])), c='r', marker='x')
+		axs2.scatter3D(X_train[selected_ids,0], X_train[selected_ids,1], np.zeros(np.shape(X_train[selected_ids,0])), c='r', marker='x')
 		# axs2.legend(['Actual', 'Pred', 'Pred random sampling'])
 		plt.show()
 
@@ -366,7 +389,7 @@ if __name__ == "__main__":
 		# img1 = axs1.matshow(field1, aspect="auto", cmap=plt.cm.YlGn, norm=colors.LogNorm(vmin=_min, vmax=_max))
 		img1 = axs1.matshow(field1, aspect="auto", cmap=plt.cm.PuOr, norm=midnorm, extent=[0.0, 3.0, 0.0, 3.0])
 		fig.colorbar(img1)
-		axs1.scatter(X_train[:number_of_sampled_points,0], X_train[:number_of_sampled_points,1], c='r', s=1)
+		axs1.scatter(X_train[selected_ids,0], X_train[selected_ids,1], c='r', s=1)
 
 		axs2 = fig.add_subplot(1,2,2)
 		# img2 = axs2.matshow(field2, aspect="auto", cmap=plt.cm.YlGn, norm=colors.LogNorm(vmin=_min, vmax=_max))
