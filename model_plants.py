@@ -90,21 +90,46 @@ class PredatorPreyPlant():
 	x2 = predator population
 
 	Dynamics
-	x1(k+1) = a x1(k) - b x1(k) x2(k) + u**2
-	x2(k+1) = - c x2(k) + d x1(k) x2(k)
+	d x1(x) /dt = a x1(t) - b x1(t) x2(t) + u**2
+	d x2(x) /dt = - c x2(t) + d x1(t) x2(t)
 	"""
-	def __init__(self, a, b, c, d, h1=1, h2=1):
+	def __init__(self, a, b, c, d, H=np.array([1, 1]).T):
 		self.a = a
 		self.b = b
 		self.c = c
 		self.d = d
-		self.h1 = h1
-		self.h2 = h2
+		self.H = H
 
 	def dynamics(self, x, u, eta, dt): #with additive noise eta
-		x0 = x[0]+ (self.a*x[0] - self.b*x[0]*x[1] + u**2 + self.h1*next(eta))*dt
-		x1 = x[1]+ (-self.c*x[1] + self.d*x[0]*x[1] + self.h2*next(eta))*dt
+		x0 = x[0]+ (self.a*x[0] - self.b*x[0]*x[1] + u**2 + self.H[0]*next(eta))*dt
+		x1 = x[1]+ (-self.c*x[1] + self.d*x[0]*x[1] + self.H[1]*next(eta))*dt
 		return np.array([x0, x1]).T
+
+	def output(self, x, u):
+		return x
+
+# Nonlinear Lorenz Equations
+class LorenzEquations():
+	"""
+	Parameters:
+	sigma, rho, beta
+
+	Dynamics
+	d x /dt = sigma * (y-x) + g(u)
+	d y /dt = x * (rho-z) - y
+	d z /dt = x*y - beta*z
+	"""
+	def __init__(self, sigma=10, beta=8/3, rho=28, H=np.array([1, 1, 1]).T):
+		self.sigma = sigma
+		self.beta = beta
+		self.rho = rho
+		self.H = H
+
+	def dynamics(self, x, u, eta, dt): #with additive noise eta
+		# x0 = x[0] + (sigma * (y-x) + u ** 3)*dt
+		x0 = x[0] + (self.sigma * (x[1]*x[0]) + u + H[0]*next(eta))*dt
+		x1 = x[1] + (x[0] * (self.rho-x[2]) - x[1]  + H[1]*next(eta))*dt
+		x2 = x[2] + (x[0]*x[1] - self.beta*x[2] + H[2]*next(eta))*dt
 
 	def output(self, x, u):
 		return x
