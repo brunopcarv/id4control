@@ -284,7 +284,7 @@ if __name__ == "__main__":
     x0 = np.array([0.1, 0.1, 0.1, 0.1])  # Initial state for Inverted Pendulum
     u_seq = np.random.uniform(-1, 1, size=2000)
     eta = random_noise_gen(std=0.01)
-    # run_krr_experiment(pendulum, x0, u_seq, eta, kernel_rbf_function_M, kernel_rbf_function_N, lambda_reg=1e-3, dt=dt, mode="full")
+    run_krr_experiment(pendulum, x0, u_seq, eta, kernel_rbf_function_M, kernel_rbf_function_N, lambda_reg=1e-3, dt=dt, mode="full")
     run_krr_experiment(pendulum, x0, u_seq, eta, kernel_rbf_function_M, kernel_rbf_function_N, lambda_reg=1e-3, dt=dt, mode="latest")
     run_krr_experiment(pendulum, x0, u_seq, eta, kernel_rbf_function_M, kernel_rbf_function_N, lambda_reg=1e-3, dt=dt, mode="landmark")
     run_krr_experiment(pendulum, x0, u_seq, eta, kernel_rbf_function_M, kernel_rbf_function_N, lambda_reg=1e-3, dt=dt, mode="naive")
