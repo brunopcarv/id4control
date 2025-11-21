@@ -1,0 +1,110 @@
+import numpy as np
+
+def rbf_kernel(x1, x2, length_scale=1.0):
+    """Radial Basis Function kernel."""
+    dist_sq = np.sum((x1 - x2)**2)
+    return np.exp(-dist_sq / (2 * length_scale**2))
+
+def compute_kernel_matrix(X, length_scale=1.0):
+    """Computes the Gram matrix for a set of points X."""
+    n = len(X)
+    K = np.zeros((n, n))
+    for i in range(n):
+        for j in range(n):
+            K[i, j] = rbf_kernel(X[i], X[j], length_scale)
+    return K
+
+def validate_theorem_iii():
+    print("=== Validating Theorem III: Online Landmark Swap Criterion ===\n")
+    
+    # Parameters
+    np.random.seed(42)
+    num_landmarks = 5
+    dim = 2
+    length_scale = 1.0
+
+    # 1. Initialize a random set of landmarks (Theta)
+    Theta = np.random.rand(num_landmarks, dim)
+    
+    # Compute Kernel Matrix and its Inverse
+    M_Theta = compute_kernel_matrix(Theta, length_scale)
+    M_inv = np.linalg.inv(M_Theta)
+    det_old = np.linalg.det(M_Theta)
+    
+    print(f"Initial Determinant (det(M_Theta)): {det_old:.6f}")
+
+    # 2. Identify the most redundant landmark (x_r)
+    # R(x_i) = 1 / (M_inv)_ii
+    redundancies = 1.0 / np.diag(M_inv)
+    r_index = np.argmin(redundancies)
+    R_xr = redundancies[r_index]
+    
+    x_r = Theta[r_index]
+    print(f"Most redundant landmark index: {r_index}")
+    print(f"Redundancy R(x_r): {R_xr:.6f}")
+
+    # 3. Create the reduced set Theta' (Theta without x_r)
+    Theta_prime = np.delete(Theta, r_index, axis=0)
+    M_prime = compute_kernel_matrix(Theta_prime, length_scale)
+    M_prime_inv = np.linalg.inv(M_prime)
+
+    # 4. Generate a new candidate point (x_new)
+    # We'll generate points until we find one that satisfies the swap condition to demonstrate success
+    print("\nSearching for a candidate x_new that satisfies the swap condition...")
+    
+    x_new = None
+    score_new = -1.0
+    
+    for _ in range(100):
+        candidate = np.random.rand(dim)
+        
+        # Calculate Score(x_new | Theta')
+        # Score = k(x,x) - v^T * M_prime_inv * v
+        k_xx = rbf_kernel(candidate, candidate, length_scale)
+        v = np.array([rbf_kernel(candidate, x, length_scale) for x in Theta_prime])
+        
+        current_score = k_xx - v.T @ M_prime_inv @ v
+        
+        if current_score > R_xr:
+            x_new = candidate
+            score_new = current_score
+            break
+    
+    if x_new is None:
+        print("Could not find a better point in random search. Try increasing iterations.")
+        return
+
+    print(f"Found candidate x_new.")
+    print(f"Score(x_new | Theta'): {score_new:.6f}")
+    
+    # 5. Check Theorem Condition
+    condition_met = score_new > R_xr
+    print(f"\nTheorem Condition (Score > R): {score_new:.6f} > {R_xr:.6f} is {condition_met}")
+
+    # 6. Verify Determinant Increase
+    # Construct new landmark set: Theta' + {x_new}
+    Theta_new = np.vstack([Theta_prime, x_new])
+    M_new = compute_kernel_matrix(Theta_new, length_scale)
+    det_new = np.linalg.det(M_new)
+    
+    print(f"New Determinant (det(M_new)): {det_new:.6f}")
+    
+    if det_new > det_old:
+        print("\n[SUCCESS] The determinant increased!")
+        print(f"Gain: {det_new - det_old:.6f}")
+    else:
+        print("\n[FAILURE] The determinant did not increase.")
+
+    # Mathematical Verification check
+    # Theorem implies: det_new = det(M_prime) * Score
+    # And: det_old = det(M_prime) * R_xr
+    det_prime = np.linalg.det(M_prime)
+    pred_det_old = det_prime * R_xr
+    pred_det_new = det_prime * score_new
+    
+    print("\n--- Algebraic Verification ---")
+    print(f"Predicted Old Det (det(M') * R): {pred_det_old:.6f} (Match: {np.isclose(det_old, pred_det_old)})")
+    print(f"Predicted New Det (det(M') * Score): {pred_det_new:.6f} (Match: {np.isclose(det_new, pred_det_new)})")
+
+if __name__ == "__main__":
+    validate_theorem_iii()
